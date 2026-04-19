@@ -877,7 +877,7 @@ function MarkdownRenderer({ content }: { content: string }) {
     const out: string[] = [];
     let inList = false;
 
-    for (let raw of lines) {
+    for (const raw of lines) {
       const line = raw.trimEnd();
 
       if (line.startsWith('### ')) {
@@ -985,7 +985,7 @@ export function EnvViewer({ content, filename }: { content: string; filename: st
           const eqIdx = line.indexOf('=');
           if (eqIdx < 0) continue;
           const key = line.slice(0, eqIdx).trim();
-          let value = line.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+          const value = line.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
           const isSensitive = /password|secret|key|token|auth|credential|private|pwd|api/i.test(key);
           vars.push({ key, value, is_sensitive: isSensitive, is_empty: !value, line_number: lineNum });
         }
