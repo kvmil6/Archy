@@ -2,3 +2,5 @@ fastapi[standard]
 httpx
 python-dotenv
 pydantic-settings
+mcp
+watchfiles

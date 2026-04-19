@@ -20,6 +20,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useGraphStore } from '@/store/useGraphStore';
+import { useAIStore } from '@/store/useAIStore';
 import { getFileContent } from '@/services/fileSystem';
 import { BACKEND_URL } from '@/services/apiClient';
 
@@ -341,6 +342,24 @@ const FileDetailCard: React.FC<{
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+/** Session token usage footer — shows total tokens across all models */
+const SessionTokenFooter: React.FC = () => {
+  const tokenUsage = useAIStore((s) => s.tokenUsage);
+  const entries = Object.values(tokenUsage);
+  const tokens = entries.reduce((sum, u) => sum + u.inputTokens + u.outputTokens, 0);
+  const models = entries.length;
+  if (tokens === 0) return null;
+  return (
+    <div className="border-t border-white/5 px-4 py-1.5 flex items-center gap-2">
+      <Activity className="w-3 h-3 text-purple-400" />
+      <span className="text-[10px] text-white/40">
+        Session: <span className="text-white/60 font-mono">{tokens.toLocaleString()}</span> tokens used across{' '}
+        <span className="text-white/60 font-mono">{models}</span> model{models !== 1 ? 's' : ''}
+      </span>
     </div>
   );
 };
@@ -797,6 +816,9 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
           </div>
         </div>
       )}
+
+      {/* Token Usage Session Total */}
+      <SessionTokenFooter />
 
       {/* Footer */}
       <div className="h-12 border-t border-white/10 flex items-center justify-between px-4 bg-surface-800/50">
