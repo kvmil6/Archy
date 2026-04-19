@@ -29,6 +29,8 @@ import {
     Trash2,
     PanelLeftClose,
     PanelLeft,
+    ChevronUp,
+    ChevronDown,
     Shield,
     ShieldCheck,
     TerminalSquare,
@@ -133,6 +135,8 @@ function CanvasPage() {
     const [excludeMigrations, setExcludeMigrations] = useState(true);
     /** Sidebar collapse state */
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    /** Navbar controls row collapse state */
+    const [navbarCollapsed, setNavbarCollapsed] = useState(false);
     /** Environment variables panel */
     const [isEnvPanelOpen, setIsEnvPanelOpen] = useState(false);
     /** Security panel */
@@ -861,7 +865,7 @@ function CanvasPage() {
         <div className="flex flex-col h-screen w-full" style={{ background: 'var(--color-bg)' }}>
             {/* Top Bar */}
             <nav
-                className="shrink-0 border-b px-3 py-2 md:px-4"
+                className="relative z-50 shrink-0 border-b px-3 py-2 md:px-4"
                 style={{
                     borderColor: 'var(--color-border)',
                     background: 'rgba(10, 10, 15, 0.92)',
@@ -979,9 +983,26 @@ function CanvasPage() {
                                 <Wand2 className="w-3.5 h-3.5" />
                                 <span>Export</span>
                             </button>
+
+                            <button
+                                onClick={() => setNavbarCollapsed((v) => !v)}
+                                className="flex items-center gap-1.5 rounded-md px-2.5 py-2 text-[12px] transition-colors hover:bg-white/5"
+                                style={{
+                                    color: 'var(--color-text-muted)',
+                                    border: '1px solid var(--color-border-strong)',
+                                }}
+                                title={navbarCollapsed ? 'Show navbar controls' : 'Hide navbar controls'}
+                            >
+                                {navbarCollapsed ? (
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                ) : (
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                )}
+                            </button>
                         </div>
                     </div>
 
+                    {!navbarCollapsed && (
                     <div
                         className="rounded-xl border px-1.5 py-1"
                         style={{
@@ -1132,6 +1153,7 @@ function CanvasPage() {
                             </button>
                         </div>
                     </div>
+                    )}
                 </div>
             </nav>
 
@@ -1843,8 +1865,8 @@ function LayoutPicker({
 
             {open && (
                 <>
-                    <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 surface-elevated z-20 min-w-[220px] overflow-hidden rounded-lg">
+                    <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 surface-elevated z-[80] min-w-[220px] overflow-hidden rounded-lg">
                         <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
                             <div className="mono-label">GRAPH LAYOUT</div>
                         </div>
@@ -1941,9 +1963,9 @@ function DatabaseButton({
 
             {open && (
                 <>
-                    <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+                    <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)} />
                     <div
-                        className="absolute right-0 top-full mt-1 surface-elevated z-20 min-w-[360px] overflow-hidden"
+                        className="absolute right-0 top-full mt-1 surface-elevated z-[80] min-w-[360px] overflow-hidden"
                         style={{ borderRadius: 8 }}
                     >
                         {/* Connection strings from .env */}
