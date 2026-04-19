@@ -1,0 +1,7 @@
+# Default owner for all files
+* @kvmil6
+
+# Area ownership
+backend/ @kvmil6
+frontend/ @kvmil6
+docs/ @kvmil6

@@ -1,0 +1,14 @@
+{
+  "name": "archy",
+  "version": "0.5.0",
+  "description": "Archy — AI-powered backend architecture visualization tool",
+  "author": "Archy Contributors",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && npx tauri dev",
+    "build": "cd frontend && npx tauri build",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build"
+  }
+}

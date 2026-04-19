@@ -1,0 +1,15 @@
+[project]
+name = "archy-backend"
+version = "0.1.0"
+description = "FastAPI backend for Archy"
+dependencies = [
+    "fastapi[standard]",
+    "httpx",
+    "python-dotenv",
+    "pydantic-settings",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+]
