@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 from ..services.architecture_service import architecture_service
 from ..services.runtime_tracker import runtime_tracker
+from ..services.graph_cache import write_graph_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,21 @@ async def analyze_project(request: ParseRequest) -> Dict[str, Any]:
             source="backend",
             metadata={"files": len(files_data)},
         )
+
+        # Write graph cache for MCP server
+        try:
+            fw = result.get("framework_detection", {}).get("framework", "unknown")
+            write_graph_cache(
+                project_path=files_data[0]["path"].rsplit("/", 1)[0] if files_data else "",
+                framework=fw,
+                nodes=result.get("nodes", []),
+                edges=result.get("edges", []),
+                insights=result.get("insights"),
+                health_score=None,
+            )
+        except Exception:
+            logger.warning("Graph cache write failed", exc_info=True)
+
         return result
     except Exception as e:
         runtime_tracker.record(

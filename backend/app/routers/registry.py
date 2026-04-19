@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from . import (
     advanced,
+    ai,
     analyze,
     brain,
     config,
@@ -17,11 +18,15 @@ from . import (
     parser,
     projects,
     runtime,
+    security,
+    snapshots,
     status,
+    trace,
 )
 
 
 ROUTERS = [
+    ai.router,
     analyze.router,
     generate.router,
     brain.router,
@@ -37,6 +42,9 @@ ROUTERS = [
     runtime.router,
     models.router,
     insights.router,
+    snapshots.router,
+    trace.router,
+    security.router,
 ]
 
 

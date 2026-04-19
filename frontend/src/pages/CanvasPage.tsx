@@ -36,6 +36,9 @@ import {
     TerminalSquare,
     Globe,
     Stethoscope,
+    Server,
+    BookOpen,
+    GitCompare,
 } from 'lucide-react';
 import { BACKEND_URL } from '@/services/apiClient';
 import { getFileContent } from '@/services/fileSystem';
@@ -54,6 +57,13 @@ import { analyzeProject, localQuickAnalyze, type AnalysisResult } from '@/servic
 import { FileDetailPanel } from '@/components/FileDetailPanel';
 import { EnvPanel } from '@/components/EnvPanel';
 import { SecurityPanel } from '@/components/SecurityPanel';
+import { HealthPill, HealthScorePanel, type HealthData } from '@/components/HealthScorePanel';
+import { CanvasEditorPanel } from '@/components/CanvasEditorPanel';
+import { MCPSettingsPanel } from '@/components/MCPSettingsPanel';
+import { OnboardingPanel } from '@/components/OnboardingPanel';
+import { DiffPanel, type DiffResult } from '@/components/DiffPanel';
+import { TraceOverlayPanel } from '@/components/TraceOverlayPanel';
+import { GraphSecurityPanel, SecurityBadge } from '@/components/GraphSecurityPanel';
 import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 import { useTrace, describeTrace } from '@/hooks/useTrace';
@@ -143,6 +153,18 @@ function CanvasPage() {
     const [isSecurityOpen, setIsSecurityOpen] = useState(false);
     const [isRuntimeOpen, setIsRuntimeOpen] = useState(false);
     const [isArchDoctorOpen, setIsArchDoctorOpen] = useState(false);
+    const [isHealthOpen, setIsHealthOpen] = useState(false);
+    const [healthData, setHealthData] = useState<HealthData | null>(null);
+    /** File currently open in the Monaco canvas editor */
+    const [editorFile, setEditorFile] = useState<string | null>(null);
+    const [editorScrollLine, setEditorScrollLine] = useState<number | undefined>(undefined);
+    const [isMCPOpen, setIsMCPOpen] = useState(false);
+    const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+    const [isDiffOpen, setIsDiffOpen] = useState(false);
+    const [activeDiff, setActiveDiff] = useState<DiffResult | null>(null);
+    const [isTraceOpen, setIsTraceOpen] = useState(false);
+    const [isGraphSecurityOpen, setIsGraphSecurityOpen] = useState(false);
+    const [securityIssueCount, setSecurityIssueCount] = useState(0);
     const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
     /** Developer tools bottom panel: 'terminal' | 'http' | null */
     const [devPanel, setDevPanel] = useState<'terminal' | 'http' | null>(null);
@@ -270,6 +292,18 @@ function CanvasPage() {
                 }
 
                 setTimeout(() => fitView({ padding: 0.18, duration: 500 }), 150);
+
+                // Compute health score
+                if (result.insights) {
+                    try {
+                        const hsRes = await fetch(`${BACKEND_URL}/analyze/health-score`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ insights: result.insights, metrics: result.metrics }),
+                        });
+                        if (hsRes.ok) setHealthData(await hsRes.json());
+                    } catch { /* silent */ }
+                }
 
                 toast.success(
                     `Parsed ${result.metrics.total_files} files${excludeMigrations ? ' · migrations omitted' : ''}`,
@@ -1151,6 +1185,50 @@ function CanvasPage() {
                                 <Stethoscope className="w-3.5 h-3.5" />
                                 Doctor
                             </button>
+
+                            <HealthPill data={healthData} onClick={() => setIsHealthOpen(true)} />
+
+                            <button
+                                onClick={() => setIsMCPOpen(true)}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
+                                style={{ color: isMCPOpen ? '#60a5fa' : 'var(--color-text-muted)' }}
+                                title="MCP Server settings"
+                            >
+                                <Server className="w-3.5 h-3.5" />
+                                MCP
+                            </button>
+
+                            <button
+                                onClick={() => setIsOnboardingOpen(true)}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
+                                style={{ color: isOnboardingOpen ? '#fbbf24' : 'var(--color-text-muted)' }}
+                                title="Onboarding — AI-generated project tour"
+                            >
+                                <BookOpen className="w-3.5 h-3.5" />
+                                Onboard
+                            </button>
+
+                            <button
+                                onClick={() => setIsDiffOpen(true)}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
+                                style={{ color: isDiffOpen || activeDiff ? '#06b6d4' : 'var(--color-text-muted)' }}
+                                title="Architecture Diff — compare snapshots"
+                            >
+                                <GitCompare className="w-3.5 h-3.5" />
+                                Diff
+                            </button>
+
+                            <button
+                                onClick={() => setIsTraceOpen(true)}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
+                                style={{ color: isTraceOpen ? '#fb923c' : 'var(--color-text-muted)' }}
+                                title="Runtime Trace — execution heat map"
+                            >
+                                <Activity className="w-3.5 h-3.5" />
+                                Trace
+                            </button>
+
+                            <SecurityBadge count={securityIssueCount} onClick={() => setIsGraphSecurityOpen(true)} />
                         </div>
                     </div>
                     )}
@@ -1247,7 +1325,10 @@ function CanvasPage() {
                             }}
                             onNodeDoubleClick={(_evt, node) => {
                                 const fp = (node.data as any)?.filepath;
-                                if (fp) setSelectedFile(fp);
+                                if (fp) {
+                                    setEditorFile(fp);
+                                    setEditorScrollLine((node.data as any)?.line_number);
+                                }
                             }}
                             onPaneClick={() => {
                                 if (traceSource) setTraceSource(null);
@@ -1532,6 +1613,14 @@ function CanvasPage() {
                 fileCount={location.state?.files?.length}
             />
 
+            {/* Health Score Panel */}
+            <HealthScorePanel
+                isOpen={isHealthOpen}
+                onClose={() => setIsHealthOpen(false)}
+                data={healthData}
+                onNodeClick={(filepath) => { setSelectedFile(filepath); setIsHealthOpen(false); }}
+            />
+
             {/* Export Architecture Modal */}
             <ExportArchitectureModal
                 isOpen={isExportModalOpen}
@@ -1564,6 +1653,78 @@ function CanvasPage() {
                     setTraceSource(id);
                 }}
             />
+
+            {/* MCP Settings Panel */}
+            <MCPSettingsPanel isOpen={isMCPOpen} onClose={() => setIsMCPOpen(false)} />
+
+            {/* Graph Security Scanner */}
+            <GraphSecurityPanel
+                isOpen={isGraphSecurityOpen}
+                onClose={() => setIsGraphSecurityOpen(false)}
+                nodes={nodes}
+                edges={edges}
+                autoRun={nodes.length > 0}
+                onHighlightNode={(nodeId) => {
+                    focusNode(nodeId);
+                    setIsGraphSecurityOpen(false);
+                }}
+                onOpenFile={(fp, line) => {
+                    setEditorFile(fp);
+                    setEditorScrollLine(line);
+                    setIsGraphSecurityOpen(false);
+                }}
+            />
+
+            {/* Trace Overlay Panel */}
+            <TraceOverlayPanel
+                isOpen={isTraceOpen}
+                onClose={() => setIsTraceOpen(false)}
+                projectPath={projectPath}
+                nodes={nodes}
+            />
+
+            {/* Diff Panel */}
+            <DiffPanel
+                isOpen={isDiffOpen}
+                onClose={() => setIsDiffOpen(false)}
+                nodes={nodes}
+                edges={edges}
+                framework={framework}
+                projectPath={projectPath}
+                onDiffApply={setActiveDiff}
+            />
+
+            {/* Onboarding Panel */}
+            <OnboardingPanel
+                isOpen={isOnboardingOpen}
+                onClose={() => setIsOnboardingOpen(false)}
+                model={currentModel}
+                nodes={nodes}
+                edges={edges}
+                framework={framework}
+                projectPath={projectPath}
+                onFocusNode={(name) => {
+                    const node = nodes.find((n: any) =>
+                        n.id === name ||
+                        (n.data?.label || '').toLowerCase().includes(name.toLowerCase())
+                    );
+                    if (node) focusNode(node.id);
+                }}
+                onOpenFile={(fp) => { setEditorFile(fp); setIsOnboardingOpen(false); }}
+            />
+
+            {/* Canvas Editor (Monaco) — double-click a node to edit */}
+            {editorFile && (
+                <CanvasEditorPanel
+                    filepath={editorFile}
+                    projectPath={projectPath}
+                    framework={framework}
+                    model={currentModel}
+                    onClose={() => { setEditorFile(null); setEditorScrollLine(undefined); }}
+                    onFileSaved={() => runAnalysis()}
+                    scrollToLine={editorScrollLine}
+                />
+            )}
         </div>
     );
 }

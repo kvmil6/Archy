@@ -29,6 +29,12 @@ _ALLOWED_EDITORS = {
 }
 
 
+class FileWriteRequest(BaseModel):
+    path: str
+    content: str
+    project_root: Optional[str] = None
+
+
 class OpenFileRequest(BaseModel):
     filepath: str
     line: Optional[int] = None
@@ -374,3 +380,37 @@ async def detect_editors():
         "default_editor": available[0]["name"] if available else None,
         "platform": platform.system(),
     }
+
+
+@router.post("/write", summary="Atomic file write — write to tmp then rename")
+async def write_file(req: FileWriteRequest):
+    """
+    Write file content atomically: write to a .tmp sibling first, then rename.
+    Path must be within project_root.
+    """
+    try:
+        resolved = _validate_target_path(req.path, req.project_root)
+    except (ValueError, FileNotFoundError, NotADirectoryError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    target = Path(resolved)
+    tmp_path = target.with_suffix(target.suffix + ".archy_tmp")
+
+    try:
+        tmp_path.write_text(req.content, encoding="utf-8")
+        tmp_path.replace(target)
+        return {
+            "success": True,
+            "path": str(target),
+            "size": len(req.content.encode("utf-8")),
+        }
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied writing to file")
+    except Exception as e:
+        logger.error(f"File write failed: {e}")
+        # Clean up tmp if it exists
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Write failed: {str(e)}")

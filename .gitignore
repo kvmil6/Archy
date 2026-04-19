@@ -53,6 +53,7 @@ frontend/.vite/
 frontend/.cache/
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
+.archy_cache/
 *.tsbuildinfo
 
 # ------------------------------
