@@ -48,6 +48,29 @@ interface OnboardingPanelProps {
 
 type Tab = 'overview' | 'flow' | 'models' | 'files';
 
+function getFriendlyAIError(status?: number, detail?: string): string {
+  const text = String(detail || '').toLowerCase();
+  if (status === 400 || text.includes('not configured')) {
+    return 'OpenRouter API key is not configured. Add it in settings first.';
+  }
+  if (status === 401 || status === 403 || text.includes('api key')) {
+    return 'OpenRouter rejected the API key. Verify backend/.env and try again.';
+  }
+  if (status === 402 || text.includes('payment required') || text.includes('billing')) {
+    return 'OpenRouter billing issue (Payment Required). Add credits or switch to a free model.';
+  }
+  if (status === 429 || text.includes('rate limit')) {
+    return 'OpenRouter rate limit reached. Wait a moment and retry.';
+  }
+  if (status === 504 || text.includes('timed out')) {
+    return 'AI request timed out. Try a shorter prompt.';
+  }
+  if (status === 502 || text.includes('model not found')) {
+    return detail || 'Selected model is unavailable. Choose a different model and retry.';
+  }
+  return detail || 'AI request failed. Please try again.';
+}
+
 function projectHash(path: string): string {
   let h = 0;
   for (let i = 0; i < path.length; i++) {
@@ -138,12 +161,16 @@ Generate the onboarding guide.`;
         }),
       });
 
-      if (!res.ok) throw new Error(`AI request failed: ${res.status}`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(getFriendlyAIError(res.status, payload?.detail));
+      }
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error('No response body');
       const decoder = new TextDecoder();
       let fullText = '';
+      let streamError: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -155,11 +182,20 @@ Generate the onboarding guide.`;
           if (d === '[DONE]') continue;
           try {
             const parsed = JSON.parse(d);
-            if (parsed.error || parsed.type === 'usage') continue;
+            if (parsed.error) {
+              streamError = getFriendlyAIError(parsed.status_code, String(parsed.error));
+              break;
+            }
+            if (parsed.type === 'usage') continue;
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) fullText += delta;
           } catch { /* skip */ }
         }
+        if (streamError) break;
+      }
+
+      if (streamError) {
+        throw new Error(streamError);
       }
 
       // Parse JSON from response (may have markdown fences)

@@ -176,6 +176,51 @@ function CanvasPage() {
     const toggleDevPanel = (panel: 'terminal' | 'http') =>
         setDevPanel(prev => prev === panel ? null : panel);
 
+    type RightDrawer =
+        | 'brain'
+        | 'env'
+        | 'security'
+        | 'runtime'
+        | 'doctor'
+        | 'health'
+        | 'mcp'
+        | 'onboarding'
+        | 'diff'
+        | 'trace'
+        | 'graph-security'
+        | 'intel';
+
+    const closeRightDrawers = useCallback(() => {
+        setIsBrainOpen(false);
+        setIsEnvPanelOpen(false);
+        setIsSecurityOpen(false);
+        setIsRuntimeOpen(false);
+        setIsArchDoctorOpen(false);
+        setIsHealthOpen(false);
+        setIsMCPOpen(false);
+        setIsOnboardingOpen(false);
+        setIsDiffOpen(false);
+        setIsTraceOpen(false);
+        setIsGraphSecurityOpen(false);
+        setIsIntelOpen(false);
+    }, []);
+
+    const openRightDrawer = useCallback((panel: RightDrawer) => {
+        closeRightDrawers();
+        if (panel === 'brain') setIsBrainOpen(true);
+        if (panel === 'env') setIsEnvPanelOpen(true);
+        if (panel === 'security') setIsSecurityOpen(true);
+        if (panel === 'runtime') setIsRuntimeOpen(true);
+        if (panel === 'doctor') setIsArchDoctorOpen(true);
+        if (panel === 'health') setIsHealthOpen(true);
+        if (panel === 'mcp') setIsMCPOpen(true);
+        if (panel === 'onboarding') setIsOnboardingOpen(true);
+        if (panel === 'diff') setIsDiffOpen(true);
+        if (panel === 'trace') setIsTraceOpen(true);
+        if (panel === 'graph-security') setIsGraphSecurityOpen(true);
+        if (panel === 'intel') setIsIntelOpen(true);
+    }, [closeRightDrawers]);
+
     const {
         nodes,
         edges,
@@ -645,7 +690,7 @@ function CanvasPage() {
             icon: commandIcons.brain,
             shortcut: ['⌘', 'B'],
             keywords: ['ai', 'intelligence', 'analyze', 'complexity', 'describe'],
-            action: () => setIsBrainOpen(true),
+            action: () => openRightDrawer('brain'),
         },
         {
             id: 'action-export',
@@ -720,7 +765,7 @@ function CanvasPage() {
             section: 'Actions',
             icon: commandIcons.layers,
             keywords: ['env', 'environment', 'variables', 'dotenv', 'secret', 'config'],
-            action: () => setIsEnvPanelOpen(true),
+            action: () => openRightDrawer('env'),
         },
         {
             id: 'view-fit',
@@ -807,9 +852,9 @@ function CanvasPage() {
             section: 'Actions',
             icon: commandIcons.layers,
             keywords: ['security', 'scan', 'vulnerability', 'secret', 'exploit', 'audit'],
-            action: () => setIsSecurityOpen(true),
+            action: () => openRightDrawer('security'),
         },
-    ], [navigate, runAnalysis, fitView, showInsightsPanel, projectName, framework, currentModel, loadedDbPath, nodes, edges, addCanvasNote, removeSelectedNodes, sidebarCollapsed]);
+    ], [navigate, runAnalysis, fitView, showInsightsPanel, projectName, framework, currentModel, loadedDbPath, nodes, edges, addCanvasNote, removeSelectedNodes, sidebarCollapsed, openRightDrawer]);
 
     useEffect(() => {
         const handleKey = (e: KeyboardEvent) => {
@@ -828,7 +873,8 @@ function CanvasPage() {
                 runAnalysis();
             } else if (mod && e.key === 'b') {
                 e.preventDefault();
-                setIsBrainOpen((v) => !v);
+                if (isBrainOpen) closeRightDrawers();
+                else openRightDrawer('brain');
             } else if (mod && e.key === 'e') {
                 e.preventDefault();
                 setIsExportModalOpen(true);
@@ -838,13 +884,14 @@ function CanvasPage() {
             } else if (e.key === 'Escape') {
                 if (selectedFile) setSelectedFile(null);
                 else if (showInsightsPanel) setShowInsightsPanel(false);
+                else closeRightDrawers();
             } else if (e.key === 'f' && !(e.target as HTMLElement)?.matches('input,textarea')) {
                 fitView({ padding: 0.2, duration: 400 });
             }
         };
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
-    }, [runAnalysis, fitView, selectedFile, showInsightsPanel]);
+    }, [runAnalysis, fitView, selectedFile, showInsightsPanel, isBrainOpen, closeRightDrawers, openRightDrawer]);
 
     const fileCount = location.state?.files?.length || 0;
 
@@ -980,7 +1027,7 @@ function CanvasPage() {
 
                         <div className="flex shrink-0 items-center gap-1.5">
                             <button
-                                onClick={() => setIsRuntimeOpen(true)}
+                                onClick={() => openRightDrawer('runtime')}
                                 className="flex items-center gap-1.5 rounded-md px-3 py-2 text-[12px] transition-colors hover:bg-white/5"
                                 style={{
                                     color: isRuntimeOpen ? 'var(--color-accent)' : 'var(--color-text-muted)',
@@ -1147,7 +1194,7 @@ function CanvasPage() {
                             )}
 
                             <button
-                                onClick={() => setIsBrainOpen(true)}
+                                onClick={() => openRightDrawer('brain')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: 'var(--color-text-muted)' }}
                             >
@@ -1156,7 +1203,7 @@ function CanvasPage() {
                             </button>
 
                             <button
-                                onClick={() => setIsEnvPanelOpen(true)}
+                                onClick={() => openRightDrawer('env')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isEnvPanelOpen ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
                                 title="View environment variables (.env files)"
@@ -1166,7 +1213,7 @@ function CanvasPage() {
                             </button>
 
                             <button
-                                onClick={() => setIsSecurityOpen(true)}
+                                onClick={() => openRightDrawer('security')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isSecurityOpen ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
                                 title="Security analysis"
@@ -1176,7 +1223,7 @@ function CanvasPage() {
                             </button>
 
                             <button
-                                onClick={() => setIsArchDoctorOpen(true)}
+                                onClick={() => openRightDrawer('doctor')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isArchDoctorOpen ? '#a78bfa' : 'var(--color-text-muted)' }}
                                 title="Architecture Doctor — AI health scan"
@@ -1185,10 +1232,10 @@ function CanvasPage() {
                                 Doctor
                             </button>
 
-                            <HealthPill data={healthData} onClick={() => setIsHealthOpen(true)} />
+                            <HealthPill data={healthData} onClick={() => openRightDrawer('health')} />
 
                             <button
-                                onClick={() => setIsMCPOpen(true)}
+                                onClick={() => openRightDrawer('mcp')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isMCPOpen ? '#60a5fa' : 'var(--color-text-muted)' }}
                                 title="MCP Server settings"
@@ -1198,7 +1245,7 @@ function CanvasPage() {
                             </button>
 
                             <button
-                                onClick={() => setIsOnboardingOpen(true)}
+                                onClick={() => openRightDrawer('onboarding')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isOnboardingOpen ? '#fbbf24' : 'var(--color-text-muted)' }}
                                 title="Onboarding — AI-generated project tour"
@@ -1208,7 +1255,7 @@ function CanvasPage() {
                             </button>
 
                             <button
-                                onClick={() => setIsDiffOpen(true)}
+                                onClick={() => openRightDrawer('diff')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isDiffOpen || activeDiff ? '#06b6d4' : 'var(--color-text-muted)' }}
                                 title="Architecture Diff — compare snapshots"
@@ -1218,7 +1265,7 @@ function CanvasPage() {
                             </button>
 
                             <button
-                                onClick={() => setIsTraceOpen(true)}
+                                onClick={() => openRightDrawer('trace')}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isTraceOpen ? '#fb923c' : 'var(--color-text-muted)' }}
                                 title="Runtime Trace — execution heat map"
@@ -1227,10 +1274,10 @@ function CanvasPage() {
                                 Trace
                             </button>
 
-                            <SecurityBadge count={securityIssueCount} onClick={() => setIsGraphSecurityOpen(true)} />
+                            <SecurityBadge count={securityIssueCount} onClick={() => openRightDrawer('graph-security')} />
 
                             <button
-                                onClick={() => { setIntelTab('blast'); setIsIntelOpen(true); }}
+                                onClick={() => { setIntelTab('blast'); openRightDrawer('intel'); }}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
                                 style={{ color: isIntelOpen ? '#6366f1' : 'var(--color-text-muted)' }}
                                 title="Intelligence Hub — Blast Radius, Dead Code, NL Query, Contracts, ADR"
@@ -1339,7 +1386,7 @@ function CanvasPage() {
                                 evt.preventDefault();
                                 setBlastTargetId(node.id);
                                 setIntelTab('blast');
-                                setIsIntelOpen(true);
+                                openRightDrawer('intel');
                             }}
                             onNodeDoubleClick={(_evt, node) => {
                                 const fp = (node.data as any)?.filepath;

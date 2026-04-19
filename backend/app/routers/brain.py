@@ -215,8 +215,14 @@ async def brain_chat(request: ChatRequest) -> ChatResponse:
             )
             if response.status_code != 200:
                     logger.error(f"OpenRouter chat error: {response.status_code} {response.text[:300]}")
+                    if response.status_code in (401, 403):
+                        raise HTTPException(status_code=401, detail="OpenRouter API key is invalid or missing.")
+                    if response.status_code == 402:
+                        raise HTTPException(status_code=402, detail="OpenRouter billing issue (Payment Required). Add credits or switch to a free model.")
                     if response.status_code == 404:
                         raise HTTPException(status_code=502, detail=f"Model not found on OpenRouter: {model}. Update AVAILABLE_MODELS in .env or select a valid model.")
+                    if response.status_code == 429:
+                        raise HTTPException(status_code=429, detail="OpenRouter rate limit reached. Wait a moment and retry.")
                     raise HTTPException(status_code=502, detail="AI service returned an error. Try again.")
             data = response.json()
             answer = data.get("choices", [{}])[0].get("message", {}).get("content", "")

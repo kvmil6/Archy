@@ -784,6 +784,8 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
                   const detail = errData.detail || '';
                   let friendlyMsg = 'Something went wrong. Please try again.';
                   if (res.status === 400) friendlyMsg = 'API key not configured. Add your OpenRouter key in the settings.';
+                  else if (res.status === 401 || res.status === 403) friendlyMsg = 'OpenRouter rejected the API key. Check backend/.env and try again.';
+                  else if (res.status === 402) friendlyMsg = 'OpenRouter billing issue (Payment Required). Add credits or switch to a free model.';
                   else if (res.status === 504 || res.status === 408) friendlyMsg = 'The AI took too long to respond. Try a shorter question.';
                   else if (res.status === 502) friendlyMsg = detail || 'AI service is temporarily unavailable. Try again in a moment.';
                   else if (res.status === 429) friendlyMsg = 'Rate limit reached. Wait a moment before sending another message.';

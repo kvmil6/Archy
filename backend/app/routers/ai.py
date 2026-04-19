@@ -10,7 +10,7 @@ import logging
 from typing import List, Dict, Optional
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -18,6 +18,28 @@ from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai-proxy"])
+
+
+def _map_upstream_error(status_code: int, detail: str) -> tuple[int, str]:
+    """Normalize provider-specific failures into stable frontend-friendly errors."""
+    raw = (detail or "").strip()
+    trimmed = raw[:400]
+
+    if status_code == 401 or status_code == 403:
+        return 401, "OpenRouter rejected the API key. Check backend/.env and try again."
+    if status_code == 402:
+        return 402, "OpenRouter billing issue (Payment Required). Add credits or switch to a free model."
+    if status_code == 404:
+        return 502, "Model not found on OpenRouter. Select a valid model from the model picker."
+    if status_code == 429:
+        return 429, "OpenRouter rate limit reached. Wait a moment and retry."
+    if status_code >= 500:
+        return 502, "Upstream AI provider is temporarily unavailable. Try again shortly."
+
+    fallback = f"AI provider error (HTTP {status_code})"
+    if trimmed:
+        fallback = f"{fallback}: {trimmed}"
+    return 502, fallback
 
 
 class AIChatMessage(BaseModel):
@@ -55,6 +77,9 @@ async def ai_chat(request: AIChatRequest):
     # Build headers — omit Authorization for Ollama (no key)
     headers: Dict[str, str] = {"Content-Type": "application/json"}
     is_ollama = "localhost:11434" in base_url or "127.0.0.1:11434" in base_url
+
+    if not api_key and not is_ollama:
+        raise HTTPException(status_code=400, detail="OpenRouter API key not configured.")
 
     if api_key and not is_ollama:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -100,8 +125,15 @@ async def _stream_sse(url: str, headers: Dict, body: Dict):
             ) as response:
                 if response.status_code != 200:
                     error_body = await response.aread()
-                    detail = error_body.decode(errors="replace")[:300]
-                    yield f'data: {{"error": "HTTP {response.status_code}: {detail}"}}\n\n'
+                    detail = error_body.decode(errors="replace")
+                    mapped_status, mapped_error = _map_upstream_error(response.status_code, detail)
+                    payload = {
+                        "error": mapped_error,
+                        "status_code": mapped_status,
+                        "upstream_status": response.status_code,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    yield "data: [DONE]\n\n"
                     return
 
                 # Try to extract usage from OpenRouter x-usage header
@@ -136,10 +168,12 @@ async def _stream_sse(url: str, headers: Dict, body: Dict):
                         yield f"data: {line}\n\n"
 
         except httpx.TimeoutException:
-            yield 'data: {"error": "Request timed out after 120s"}\n\n'
+            yield 'data: {"error": "Request timed out after 120s", "status_code": 504}\n\n'
+            yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error(f"AI proxy stream error: {e}")
-            yield f'data: {{"error": "{str(e)}"}}\n\n'
+            yield f'data: {{"error": "{str(e)}", "status_code": 500}}\n\n'
+            yield "data: [DONE]\n\n"
 
     # Always send a final usage event
     yield f'data: {{"type": "usage", "input_tokens": {input_tokens}, "output_tokens": {output_tokens}}}\n\n'
@@ -151,8 +185,8 @@ async def _non_streaming(url: str, headers: Dict, body: Dict):
         try:
             response = await client.post(url, headers=headers, json=body, timeout=120.0)
             if response.status_code != 200:
-                detail = response.text[:300]
-                return {"error": f"HTTP {response.status_code}: {detail}"}
+                mapped_status, mapped_error = _map_upstream_error(response.status_code, response.text)
+                raise HTTPException(status_code=mapped_status, detail=mapped_error)
 
             data = response.json()
 
@@ -169,7 +203,9 @@ async def _non_streaming(url: str, headers: Dict, body: Dict):
             return data
 
         except httpx.TimeoutException:
-            return {"error": "Request timed out after 120s"}
+            raise HTTPException(status_code=504, detail="AI request timed out after 120s")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"AI proxy non-stream error: {e}")
-            return {"error": str(e)}
+            raise HTTPException(status_code=500, detail="AI proxy request failed")
