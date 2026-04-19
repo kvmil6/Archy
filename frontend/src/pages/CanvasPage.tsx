@@ -62,6 +62,10 @@ import { OnboardingPanel } from '@/components/OnboardingPanel';
 import { DiffPanel, type DiffResult } from '@/components/DiffPanel';
 import { TraceOverlayPanel } from '@/components/TraceOverlayPanel';
 import { GraphSecurityPanel, SecurityBadge } from '@/components/GraphSecurityPanel';
+import { ModelSwitcher } from '@/components/ModelSwitcher';
+import { IntelligenceHub } from '@/components/IntelligenceHub';
+import { EdgeExplainer } from '@/components/EdgeExplainer';
+import { useAIStore } from '@/store/useAIStore';
 import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 import { useTrace, describeTrace } from '@/hooks/useTrace';
@@ -161,6 +165,11 @@ function CanvasPage() {
     const [isTraceOpen, setIsTraceOpen] = useState(false);
     const [isGraphSecurityOpen, setIsGraphSecurityOpen] = useState(false);
     const [securityIssueCount, setSecurityIssueCount] = useState(0);
+    const [isIntelOpen, setIsIntelOpen] = useState(false);
+    const [intelTab, setIntelTab] = useState<'blast' | 'dead' | 'nlquery' | 'contracts' | 'adr' | 'refactor' | 'drift'>('blast');
+    const [blastTargetId, setBlastTargetId] = useState<string | null>(null);
+    const [clickedEdge, setClickedEdge] = useState<{ source: string; target: string } | null>(null);
+    const [edgePopupPos, setEdgePopupPos] = useState<{ x: number; y: number } | null>(null);
     const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
     /** Developer tools bottom panel: 'terminal' | 'http' | null */
     const [devPanel, setDevPanel] = useState<'terminal' | 'http' | null>(null);
@@ -585,7 +594,18 @@ function CanvasPage() {
 
     const projectName = location.state?.projectName || 'Untitled';
     const framework = location.state?.framework;
-    const currentModel = location.state?.model || '';
+
+    // AI model — stored in Zustand so it can be switched live from the canvas
+    const currentModel = useAIStore((s) => s.selectedModelId);
+    const setSelectedModel = useAIStore((s) => s.setSelectedModel);
+
+    // Initialise store from location.state on first render
+    useEffect(() => {
+        const navModel = location.state?.model || '';
+        if (navModel && !currentModel) {
+            setSelectedModel(navModel);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const commands: Command[] = useMemo(() => [
         {
@@ -1208,6 +1228,16 @@ function CanvasPage() {
                             </button>
 
                             <SecurityBadge count={securityIssueCount} onClick={() => setIsGraphSecurityOpen(true)} />
+
+                            <button
+                                onClick={() => { setIntelTab('blast'); setIsIntelOpen(true); }}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] hover:bg-white/5 transition-colors"
+                                style={{ color: isIntelOpen ? '#6366f1' : 'var(--color-text-muted)' }}
+                                title="Intelligence Hub — Blast Radius, Dead Code, NL Query, Contracts, ADR"
+                            >
+                                <Zap className="w-3.5 h-3.5" />
+                                Intel
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1301,6 +1331,16 @@ function CanvasPage() {
                                     return;
                                 }
                             }}
+                            onEdgeClick={(evt, edge) => {
+                                setClickedEdge({ source: edge.source, target: edge.target });
+                                setEdgePopupPos({ x: evt.clientX + 10, y: evt.clientY - 10 });
+                            }}
+                            onNodeContextMenu={(evt, node) => {
+                                evt.preventDefault();
+                                setBlastTargetId(node.id);
+                                setIntelTab('blast');
+                                setIsIntelOpen(true);
+                            }}
                             onNodeDoubleClick={(_evt, node) => {
                                 const fp = (node.data as any)?.filepath;
                                 if (fp) {
@@ -1310,6 +1350,7 @@ function CanvasPage() {
                             }}
                             onPaneClick={() => {
                                 if (traceSource) setTraceSource(null);
+                                if (clickedEdge) { setClickedEdge(null); setEdgePopupPos(null); }
                             }}
                             nodeTypes={nodeTypes}
                             deleteKeyCode={['Delete', 'Backspace']}
@@ -1530,17 +1571,7 @@ function CanvasPage() {
                                 {smellCount + circularCount} issues
                             </button>
                         )}
-                        {currentModel ? (
-                            <span className="status-bar-item" title={`AI model: ${currentModel}`}>
-                                <Brain className="w-3 h-3" style={{ color: 'var(--color-accent)' }} />
-                                <span>{currentModel.split('/').pop()?.replace(':free', '')}</span>
-                            </span>
-                        ) : (
-                            <span className="status-bar-item" title="AI disabled — local analysis only">
-                                <Brain className="w-3 h-3" style={{ color: 'var(--color-text-faint)' }} />
-                                <span>AI off</span>
-                            </span>
-                        )}
+                        <ModelSwitcher value={currentModel} onChange={setSelectedModel} />
                         <span className="status-bar-item">
                             <Zap className="w-3 h-3" />
                             <span>Py AST</span>
@@ -1634,6 +1665,34 @@ function CanvasPage() {
 
             {/* MCP Settings Panel */}
             <MCPSettingsPanel isOpen={isMCPOpen} onClose={() => setIsMCPOpen(false)} />
+
+            {/* Edge Explainer popover */}
+            <EdgeExplainer
+                edge={clickedEdge}
+                nodes={nodes}
+                position={edgePopupPos}
+                onClose={() => { setClickedEdge(null); setEdgePopupPos(null); }}
+                model={currentModel}
+            />
+
+            {/* Intelligence Hub */}
+            <IntelligenceHub
+                isOpen={isIntelOpen}
+                onClose={() => setIsIntelOpen(false)}
+                nodes={nodes}
+                edges={edges}
+                blastTargetId={blastTargetId}
+                initialTab={intelTab}
+                onFocusNode={(id) => { focusNode(id); }}
+                onHighlightNodes={(ids) => {
+                    // Flash highlight — change node style temporarily
+                    // This could be enhanced with node style overrides
+                }}
+                latestDiff={activeDiff}
+                projectName={projectName}
+                healthScore={healthData?.score}
+                model={currentModel}
+            />
 
             {/* Graph Security Scanner */}
             <GraphSecurityPanel
