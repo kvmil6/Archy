@@ -308,6 +308,9 @@
   align-items: center;
   gap: 16px;
   height: 24px;
+  overflow: visible;
+  position: relative;
+  z-index: 50;
 }
 .status-bar-item {
   display: flex;
