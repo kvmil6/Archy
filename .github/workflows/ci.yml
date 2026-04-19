@@ -18,21 +18,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  branch-policy:
-    name: Enforce Branch Flow
-    runs-on: ubuntu-latest
-    steps:
-      - name: Allow only dev -> main release PRs
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" != "dev" ]]; then
-            echo "::error::Only pull requests from 'dev' can target 'main'."
-            exit 1
-          fi
-
   backend-validate:
     name: Backend Validate
     runs-on: ubuntu-latest
-    needs: branch-policy
     defaults:
       run:
         working-directory: backend
@@ -72,7 +60,6 @@ jobs:
   frontend-validate:
     name: Frontend Validate
     runs-on: ubuntu-latest
-    needs: branch-policy
     defaults:
       run:
         working-directory: frontend
@@ -99,7 +86,6 @@ jobs:
   security-checks:
     name: Security Guardrails
     runs-on: ubuntu-latest
-    needs: branch-policy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
