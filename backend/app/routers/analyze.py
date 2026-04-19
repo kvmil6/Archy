@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Any
 from ..parsers.graph_to_prompt import build_prompt_from_graph
 from ..services.openrouter import stream_openrouter
+from ..services.blast_radius import compute_blast_radius
 from ..schemas.graph import GraphSchema
 import logging
 
@@ -144,3 +145,15 @@ async def health_score_get():
         "breakdown": {"circular_deps": 0, "god_classes": 0, "orphan_files": 0, "hotspots": 0, "cluttered_models": 0},
         "penalties": [],
     }
+
+
+class BlastRadiusRequest(BaseModel):
+    node_id: str
+    nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    max_depth: int = 6
+
+
+@router.post("/blast-radius", summary="Compute blast radius for a node")
+async def blast_radius(req: BlastRadiusRequest):
+    return compute_blast_radius(req.node_id, req.nodes, req.edges, req.max_depth)
