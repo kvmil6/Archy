@@ -377,6 +377,7 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
   const [chatError, setChatError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { nodes } = useGraphStore();
+  const selectedModelId = useAIStore((s) => s.selectedModelId);
 
   useEffect(() => {
     if (isOpen) {
@@ -501,6 +502,7 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
         body: JSON.stringify({ 
           files: fileContents,
           project_name: 'current-project',
+          model: selectedModelId || undefined,
         }),
       });
 
@@ -555,7 +557,7 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
     } finally {
       setIsLoading(false);
     }
-  }, [files, useLocalAnalysis, apiStatus]);
+  }, [files, useLocalAnalysis, apiStatus, selectedModelId]);
 
   const toggleFile = (path: string) => {
     setExpandedFiles(prev => {
@@ -773,7 +775,11 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
                 const res = await fetch(`${BACKEND_URL}/brain/chat`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ question, context }),
+                  body: JSON.stringify({
+                    question,
+                    context,
+                    model: selectedModelId || undefined,
+                  }),
                 });
                 if (res.ok) {
                   const data = await res.json();
@@ -784,6 +790,8 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
                   const detail = errData.detail || '';
                   let friendlyMsg = 'Something went wrong. Please try again.';
                   if (res.status === 400) friendlyMsg = 'API key not configured. Add your OpenRouter key in the settings.';
+                  else if (res.status === 401 || res.status === 403) friendlyMsg = 'OpenRouter rejected the API key. Check backend/.env and try again.';
+                  else if (res.status === 402) friendlyMsg = 'OpenRouter billing issue (Payment Required). Add credits or switch to a free model.';
                   else if (res.status === 504 || res.status === 408) friendlyMsg = 'The AI took too long to respond. Try a shorter question.';
                   else if (res.status === 502) friendlyMsg = detail || 'AI service is temporarily unavailable. Try again in a moment.';
                   else if (res.status === 429) friendlyMsg = 'Rate limit reached. Wait a moment before sending another message.';

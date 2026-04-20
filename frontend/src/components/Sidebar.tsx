@@ -223,8 +223,7 @@ function shouldHideFromExplorer(fullPath: string): boolean {
   if (normalized.startsWith('.claude/') || normalized.includes('/.claude/')) return true;
   if (filename.endsWith('.md')) return true;
 
-  // Hide environment and secret-bearing files from the explorer UI.
-  if (filename === '.env' || filename.startsWith('.env.')) return true;
+  // Keep .env files visible so users can inspect environment config from the explorer.
   if (/\.(pem|key|p12|pfx)$/.test(filename)) return true;
   if (/(^|[._-])(secret|secrets|credential|credentials)([._-]|$)/.test(filename)) return true;
 

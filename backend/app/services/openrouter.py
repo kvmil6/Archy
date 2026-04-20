@@ -1,7 +1,29 @@
 import httpx
+import json
 import os
 from typing import List, Dict, Optional, Union
 from ..config import get_settings
+
+
+def _map_openrouter_error(status_code: int, detail: str, model_name: str) -> tuple[int, str]:
+    raw = (detail or '').strip()
+    trimmed = raw[:300]
+
+    if status_code in (401, 403):
+        return 401, 'OpenRouter rejected the API key. Check backend/.env and retry.'
+    if status_code == 402:
+        return 402, 'OpenRouter billing issue (Payment Required). Add credits or switch to a free model.'
+    if status_code == 404:
+        return 502, f'Model not found — check your OpenRouter model ID. Got: {model_name}'
+    if status_code == 429:
+        return 429, 'OpenRouter rate limit reached. Wait a moment and retry.'
+    if status_code >= 500:
+        return 502, 'OpenRouter is temporarily unavailable. Try again in a moment.'
+
+    msg = f'AI provider error (HTTP {status_code})'
+    if trimmed:
+        msg = f'{msg}: {trimmed}'
+    return 502, msg
 
 
 async def stream_openrouter(
@@ -20,7 +42,8 @@ async def stream_openrouter(
     api_key = os.environ.get('OPENROUTER_API_KEY') or settings.OPENROUTER_API_KEY
 
     if not api_key:
-        yield "data: Error: OPENROUTER_API_KEY not configured\n\n"
+        yield 'data: {"error": "OpenRouter API key not configured.", "status_code": 400}\n\n'
+        yield "data: [DONE]\n\n"
         return
 
     # Normalize to messages
@@ -29,7 +52,7 @@ async def stream_openrouter(
     else:
         messages = prompt_or_messages
 
-    model_name = model or settings.available_models_list[0]
+    model_name = settings.resolve_model(model)
 
     async with httpx.AsyncClient() as client:
         try:
@@ -51,11 +74,15 @@ async def stream_openrouter(
             ) as response:
                 if response.status_code != 200:
                     body = await response.aread()
-                    detail = body.decode(errors="replace")[:200]
-                    if response.status_code == 404:
-                        yield f'data: {{"error": "Model not found — check your OpenRouter model ID in settings. Got: {model_name}"}}\n\n'
-                    else:
-                        yield f'data: {{"error": "HTTP {response.status_code}: {detail}"}}\n\n'
+                    detail = body.decode(errors="replace")
+                    mapped_status, mapped_error = _map_openrouter_error(response.status_code, detail, model_name)
+                    payload = {
+                        "error": mapped_error,
+                        "status_code": mapped_status,
+                        "upstream_status": response.status_code,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    yield "data: [DONE]\n\n"
                     return
 
                 async for line in response.aiter_lines():
@@ -66,4 +93,5 @@ async def stream_openrouter(
                         else:
                             yield f"data: {line}\n\n"
         except Exception as e:
-            yield f'data: {{"error": "{str(e)}"}}\n\n'
+            yield f'data: {{"error": "{str(e)}", "status_code": 500}}\n\n'
+            yield "data: [DONE]\n\n"

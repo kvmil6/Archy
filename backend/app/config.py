@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     ARCHY_LINK_PORT: int = 47291
     ARCHY_OUTPUT_DIR: str = str(Path.home() / ".archy" / "projects")
 
-    AVAILABLE_MODELS: str = "anthropic/claude-sonnet-4-5,openai/gpt-4o,google/gemini-2.0-flash-001,qwen/qwen3-coder:free,google/gemma-4-31b-it:free,meta-llama/llama-3.1-405b"
+    AVAILABLE_MODELS: str = "anthropic/claude-opus-4.7,google/gemini-3.1-pro-preview,anthropic/claude-sonnet-4.6,google/gemma-4-31b-it:free,minimax/minimax-m2.5:free,openai/gpt-oss-120b:free,qwen/qwen3-coder:free"
     
     @property
     def cors_origins_list(self) -> List[str]:
@@ -38,6 +38,21 @@ class Settings(BaseSettings):
     @property
     def available_models_list(self) -> List[str]:
         return [m.strip() for m in self.AVAILABLE_MODELS.split(",") if m.strip()]
+
+    def resolve_model(self, requested: Optional[str] = None, prefer_free: bool = True) -> str:
+        if requested and requested.strip():
+            return requested.strip()
+
+        models = self.available_models_list
+        if prefer_free:
+            free_model = next((m for m in models if ":free" in m), None)
+            if free_model:
+                return free_model
+
+        if models:
+            return models[0]
+
+        return "qwen/qwen3-coder:free"
     
     model_config = SettingsConfigDict(
         env_file=(str(BACKEND_DIR / ".env"), str(REPO_DIR / ".env")),

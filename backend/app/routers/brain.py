@@ -23,6 +23,7 @@ class FileContent(BaseModel):
 class BrainAnalyzeRequest(BaseModel):
     files: List[FileContent]
     project_name: Optional[str] = "project"
+    model: Optional[str] = None
 
 
 class FileAnalysisResponse(BaseModel):
@@ -55,7 +56,7 @@ class BrainAnalyzeResponse(BaseModel):
 async def brain_analyze(request: BrainAnalyzeRequest) -> BrainAnalyzeResponse:
     try:
         files_data = [{"path": f.path, "content": f.content} for f in request.files]
-        result = await analyze_project_files(files_data)
+        result = await analyze_project_files(files_data, model=request.model)
         analyses = {}
         for path, data in result['analyses'].items():
             analyses[path] = FileAnalysisResponse(**data)
@@ -73,7 +74,7 @@ async def brain_analyze(request: BrainAnalyzeRequest) -> BrainAnalyzeResponse:
 async def smart_descriptions(request: BrainAnalyzeRequest) -> Dict[str, Any]:
     try:
         files_data = [{"path": f.path, "content": f.content} for f in request.files]
-        result = await analyze_project_files(files_data)
+        result = await analyze_project_files(files_data, model=request.model)
         descriptions = {}
         for path, analysis in result['analyses'].items():
             descriptions[path] = {
@@ -92,6 +93,7 @@ async def smart_descriptions(request: BrainAnalyzeRequest) -> Dict[str, Any]:
 class ChatRequest(BaseModel):
     question: str
     context: Optional[Dict[str, Any]] = None
+    model: Optional[str] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -191,7 +193,7 @@ async def brain_chat(request: ChatRequest) -> ChatResponse:
         {"role": "user", "content": request.question},
     ]
 
-    model = settings.available_models_list[0] if settings.available_models_list else "anthropic/claude-3.5-sonnet"
+    model = settings.resolve_model(request.model)
 
     try:
         import httpx
@@ -215,8 +217,14 @@ async def brain_chat(request: ChatRequest) -> ChatResponse:
             )
             if response.status_code != 200:
                     logger.error(f"OpenRouter chat error: {response.status_code} {response.text[:300]}")
+                    if response.status_code in (401, 403):
+                        raise HTTPException(status_code=401, detail="OpenRouter API key is invalid or missing.")
+                    if response.status_code == 402:
+                        raise HTTPException(status_code=402, detail="OpenRouter billing issue (Payment Required). Add credits or switch to a free model.")
                     if response.status_code == 404:
                         raise HTTPException(status_code=502, detail=f"Model not found on OpenRouter: {model}. Update AVAILABLE_MODELS in .env or select a valid model.")
+                    if response.status_code == 429:
+                        raise HTTPException(status_code=429, detail="OpenRouter rate limit reached. Wait a moment and retry.")
                     raise HTTPException(status_code=502, detail="AI service returned an error. Try again.")
             data = response.json()
             answer = data.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -239,6 +247,7 @@ class SecurityFile(BaseModel):
 class SecurityScanRequest(BaseModel):
     files: List[SecurityFile]
     framework: Optional[str] = None
+    model: Optional[str] = None
 
 class SecurityFinding(BaseModel):
     severity: str
@@ -374,7 +383,7 @@ async def security_scan(request: SecurityScanRequest) -> SecurityScanResponse:
                 "Be direct, developer-focused, and actionable. No bullet points, just clear prose."
             )
 
-            model = settings.AVAILABLE_MODELS.split(",")[0].strip()
+            model = settings.resolve_model(request.model)
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{settings.OPENROUTER_BASE_URL}/chat/completions",

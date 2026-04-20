@@ -119,7 +119,7 @@ async def analyze_file(request: FileInsightRequest):
         {"role": "user", "content": prompt},
     ]
     
-    model = request.model or settings.AVAILABLE_MODELS.split(",")[0].strip()
+    model = settings.resolve_model(request.model)
     
     try:
         return StreamingResponse(

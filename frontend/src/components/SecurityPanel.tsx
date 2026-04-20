@@ -38,6 +38,7 @@ interface SecurityPanelProps {
   onClose: () => void;
   files: string[];
   framework?: string;
+  model?: string;
 }
 
 const severityColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -149,7 +150,7 @@ function generateHtmlReport(result: SecurityResult, framework: string, scannedCo
 </div></body></html>`;
 }
 
-export const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose, files, framework }) => {
+export const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose, files, framework, model }) => {
   const [result, setResult] = useState<SecurityResult | null>(null);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,7 +181,7 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose, f
       const res = await fetch(`${BACKEND_URL}/brain/security-scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files: fileData, framework }),
+        body: JSON.stringify({ files: fileData, framework, model: model || undefined }),
       });
 
       if (!res.ok) {

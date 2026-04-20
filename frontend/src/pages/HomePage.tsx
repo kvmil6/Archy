@@ -36,6 +36,8 @@ import { detectFrameworkSmart } from '@/services/frameworkDetector';
 import { useToast } from '@/components/Toast';
 import { pingBackend, BACKEND_URL } from '@/services/apiClient';
 import { listProjects, deleteProject, renameProject, type SavedProject } from '@/services/projectManager';
+import { DEFAULT_FREE_MODEL_ID } from '@/services/modelRegistry';
+import { useAIStore } from '@/store/useAIStore';
 
 type ApiStatusType = {
     checked: boolean;
@@ -59,7 +61,15 @@ type SaveState =
 export default function HomePage() {
     const navigate = useNavigate();
     const toast = useToast();
-    const [selectedModel, setSelectedModel] = useState('anthropic/claude-3.5-sonnet');
+    const storeModelId = useAIStore((s) => s.selectedModelId);
+    const setStoreModel = useAIStore((s) => s.setSelectedModel);
+    const [selectedModel, setSelectedModelLocal] = useState(storeModelId || DEFAULT_FREE_MODEL_ID);
+
+    // Keep the global Zustand store in sync whenever the local selection changes
+    const setSelectedModel = useCallback((id: string) => {
+        setSelectedModelLocal(id);
+        setStoreModel(id);
+    }, [setStoreModel]);
     const [projectPath, setProjectPath] = useState('');
     const [isScanning, setIsScanning] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);

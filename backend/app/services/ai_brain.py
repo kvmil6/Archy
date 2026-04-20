@@ -43,9 +43,10 @@ class FileAnalysis:
 
 
 class AIBrain:
-    def __init__(self):
+    def __init__(self, model: Optional[str] = None):
         self.analyses: Dict[str, FileAnalysis] = {}
         self.relationship_graph: Dict[str, List[str]] = {}
+        self.model_override = model
 
     async def analyze_files(self, files_data: List[Dict[str, str]]) -> Dict[str, Any]:
         for file_data in files_data:
@@ -92,14 +93,10 @@ class AIBrain:
                 analysis.purpose = f"{analysis.language} file with {analysis.line_count} lines"
                 analysis.complexity_score = min(10, analysis.line_count // 50)
             return
-        model_name = (
-            get_settings().available_models_list[0]
-            if get_settings().available_models_list
-            else 'anthropic/claude-3.5-sonnet'
-        )
+        settings = get_settings()
+        model_name = settings.resolve_model(self.model_override)
         async with httpx.AsyncClient() as client:
             try:
-                settings = get_settings()
                 response = await client.post(
                     f"{settings.OPENROUTER_BASE_URL}/chat/completions",
                     headers={
@@ -200,6 +197,6 @@ class AIBrain:
 ai_brain = AIBrain()
 
 
-async def analyze_project_files(files_data: List[Dict[str, str]]) -> Dict[str, Any]:
-    brain = AIBrain()
+async def analyze_project_files(files_data: List[Dict[str, str]], model: Optional[str] = None) -> Dict[str, Any]:
+    brain = AIBrain(model=model)
     return await brain.analyze_files(files_data)
