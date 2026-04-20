@@ -52,7 +52,7 @@ async def stream_openrouter(
     else:
         messages = prompt_or_messages
 
-    model_name = model or settings.available_models_list[0]
+    model_name = settings.resolve_model(model)
 
     async with httpx.AsyncClient() as client:
         try:

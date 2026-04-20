@@ -82,6 +82,7 @@ Be specific. Use actual class/function names from the code.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: prompt,
+          model: model || undefined,
           context: {
             files: [],
             file_contents: {},

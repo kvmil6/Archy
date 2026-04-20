@@ -465,6 +465,10 @@ function CanvasPage() {
 
     const projectPath = (location.state?.projectPath as string) || '';
     const projectFiles = (location.state?.files as string[]) || [];
+    const envFileCount = useMemo(
+        () => projectFiles.filter((f) => (f.split('/').pop()?.toLowerCase() || '').startsWith('.env')).length,
+        [projectFiles],
+    );
     const routeProjectId = location.state?.projectId as string | undefined;
     const routeModel = (location.state?.model as string) || '';
     const autosaveProjectName = (location.state?.projectName as string) || 'Untitled';
@@ -647,7 +651,7 @@ function CanvasPage() {
     // Initialise store from location.state on first render
     useEffect(() => {
         const navModel = location.state?.model || '';
-        if (navModel && !currentModel) {
+        if (navModel && navModel !== currentModel) {
             setSelectedModel(navModel);
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1210,6 +1214,14 @@ function CanvasPage() {
                             >
                                 <Shield className="w-3.5 h-3.5" />
                                 .env
+                                {envFileCount > 0 && (
+                                    <span
+                                        className="text-[9px] font-mono px-1 rounded"
+                                        style={{ background: 'var(--color-accent-dim)', color: 'var(--color-accent)' }}
+                                    >
+                                        {envFileCount}
+                                    </span>
+                                )}
                             </button>
 
                             <button
@@ -1647,6 +1659,7 @@ function CanvasPage() {
                 onClose={() => setIsSecurityOpen(false)}
                 files={location.state?.files || []}
                 framework={framework}
+                model={currentModel ?? undefined}
             />
 
             {/* Architecture Doctor Panel */}

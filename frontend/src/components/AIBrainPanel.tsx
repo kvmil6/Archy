@@ -377,6 +377,7 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
   const [chatError, setChatError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { nodes } = useGraphStore();
+  const selectedModelId = useAIStore((s) => s.selectedModelId);
 
   useEffect(() => {
     if (isOpen) {
@@ -501,6 +502,7 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
         body: JSON.stringify({ 
           files: fileContents,
           project_name: 'current-project',
+          model: selectedModelId || undefined,
         }),
       });
 
@@ -555,7 +557,7 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
     } finally {
       setIsLoading(false);
     }
-  }, [files, useLocalAnalysis, apiStatus]);
+  }, [files, useLocalAnalysis, apiStatus, selectedModelId]);
 
   const toggleFile = (path: string) => {
     setExpandedFiles(prev => {
@@ -773,7 +775,11 @@ export const AIBrainPanel: React.FC<AIBrainPanelProps> = ({ isOpen, onClose, fil
                 const res = await fetch(`${BACKEND_URL}/brain/chat`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ question, context }),
+                  body: JSON.stringify({
+                    question,
+                    context,
+                    model: selectedModelId || undefined,
+                  }),
                 });
                 if (res.ok) {
                   const data = await res.json();

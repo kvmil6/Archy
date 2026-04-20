@@ -23,6 +23,7 @@ class FileContent(BaseModel):
 class BrainAnalyzeRequest(BaseModel):
     files: List[FileContent]
     project_name: Optional[str] = "project"
+    model: Optional[str] = None
 
 
 class FileAnalysisResponse(BaseModel):
@@ -55,7 +56,7 @@ class BrainAnalyzeResponse(BaseModel):
 async def brain_analyze(request: BrainAnalyzeRequest) -> BrainAnalyzeResponse:
     try:
         files_data = [{"path": f.path, "content": f.content} for f in request.files]
-        result = await analyze_project_files(files_data)
+        result = await analyze_project_files(files_data, model=request.model)
         analyses = {}
         for path, data in result['analyses'].items():
             analyses[path] = FileAnalysisResponse(**data)
@@ -73,7 +74,7 @@ async def brain_analyze(request: BrainAnalyzeRequest) -> BrainAnalyzeResponse:
 async def smart_descriptions(request: BrainAnalyzeRequest) -> Dict[str, Any]:
     try:
         files_data = [{"path": f.path, "content": f.content} for f in request.files]
-        result = await analyze_project_files(files_data)
+        result = await analyze_project_files(files_data, model=request.model)
         descriptions = {}
         for path, analysis in result['analyses'].items():
             descriptions[path] = {
@@ -92,6 +93,7 @@ async def smart_descriptions(request: BrainAnalyzeRequest) -> Dict[str, Any]:
 class ChatRequest(BaseModel):
     question: str
     context: Optional[Dict[str, Any]] = None
+    model: Optional[str] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -191,7 +193,7 @@ async def brain_chat(request: ChatRequest) -> ChatResponse:
         {"role": "user", "content": request.question},
     ]
 
-    model = settings.available_models_list[0] if settings.available_models_list else "anthropic/claude-3.5-sonnet"
+    model = settings.resolve_model(request.model)
 
     try:
         import httpx
@@ -245,6 +247,7 @@ class SecurityFile(BaseModel):
 class SecurityScanRequest(BaseModel):
     files: List[SecurityFile]
     framework: Optional[str] = None
+    model: Optional[str] = None
 
 class SecurityFinding(BaseModel):
     severity: str
@@ -380,7 +383,7 @@ async def security_scan(request: SecurityScanRequest) -> SecurityScanResponse:
                 "Be direct, developer-focused, and actionable. No bullet points, just clear prose."
             )
 
-            model = settings.AVAILABLE_MODELS.split(",")[0].strip()
+            model = settings.resolve_model(request.model)
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{settings.OPENROUTER_BASE_URL}/chat/completions",
